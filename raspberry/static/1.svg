@@ -1,0 +1,21 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 554 554" width="554" height="554">
+	<title>-e-2</title>
+	<defs>
+		<linearGradient id="g1" x2="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(378.003,-654.72,654.72,378.003,-239.08,415.359)">
+			<stop offset="0" stop-color="#ff3d61"/>
+			<stop offset="1" stop-color="#b02827"/>
+		</linearGradient>
+		<linearGradient id="g2" x2="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-474.218,474.218,-474.218,-474.218,751.497,277)">
+			<stop offset="0" stop-color="#ff3d61"/>
+			<stop offset="1" stop-color="#b02827"/>
+		</linearGradient>
+	</defs>
+	<style>
+		.s0 { fill: url(#g1) } 
+		.s1 { fill: url(#g2) } 
+	</style>
+	<g id="-e-2">
+		<path id="&lt;Path&gt;" class="s0" d="m83.4 553.7c-45.7 0-82.8-37.1-82.8-82.8v-387.8c0-45.7 37.1-82.8 82.8-82.8h387.7c45.8 0 82.9 37.1 82.9 82.8v387.8c0 45.7-37.1 82.8-82.9 82.8z"/>
+		<path id="&lt;Path&gt;" class="s1" d="m111.2 514.1c-39.2 0-71-31.8-71-71v-332.2c0-39.2 31.8-71 71-71h332.2c39.2 0 71 31.8 71 71v332.2c0 39.2-31.8 71-71 71z"/>
+	</g>
+</svg>

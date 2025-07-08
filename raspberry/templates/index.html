@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simon Game Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 20px;
+            flex-grow: 1;
+        }
+
+        .game-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .history-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            height: 300px;
+            overflow-y: auto;
+            grid-column: 1 / -1;
+        }
+
+        .instructions {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #333;
+            font-weight: bold;
+            text-align: center;
+        }
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .button {
+            width: 150px;
+            height: 150px;
+            cursor: pointer;
+            opacity: 0.3;
+            transition: all 0.3s;
+            border-radius: 25px;
+            overflow: hidden;
+            box-shadow: 0 5px 25px 8px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .button img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .button.active {
+            opacity: 1;
+            transform: scale(1.15);
+            box-shadow: 0 8px 30px 12px rgba(0,0,0,0.3);
+        }
+
+        .progress-bar {
+            width: 80%;
+            height: 30px;
+            background: #eee;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px auto;
+        }
+
+        .progress {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s;
+        }
+
+        .game-over {
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 28px;
+            margin: 30px 0;
+            display: none;
+            text-align: center;
+        }
+
+        .game-over.lost { background: #ff4444; }
+        .game-over.won { background: #4CAF50; }
+        .game-over.system-error { background: #ff9900; }
+
+        .chart-container {
+            width: 450px;
+            height: 450px;
+            padding: 20px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #errorChart {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="game-panel">
+            <h1>Simon Game Controller</h1>
+            <div class="instructions" id="instructions">Naciśnij podświetlony przycisk!</div>
+            <div class="progress-bar">
+                <div class="progress" id="progress"></div>
+            </div>
+            <div class="game-over lost" id="gameOverLost">Nacisnąłeś zły przycisk! Koniec gry!</div>
+            <div class="game-over won" id="gameOverWon">Sukces! Ukończyłeś sekwencję! Oczekiwanie na kolejną sekwencję...</div>
+            <div class="game-over system-error" id="gameOverSystemError">Przepraszamy! Wygląda na to, że coś poszło nie tak z naszej strony. Niestety, przegrałeś. Spróbuj ponownie!</div>
+
+            <div class="buttons">
+                {% for key, value in color_map.items() %}
+                <div class="button" id="{{ key }}">
+                    <img src="{{ url_for('static', filename=value.svg) }}" alt="{{ value.name }}">
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="game-panel">
+            <h2>Statystyki</h2>
+            <div class="chart-container">
+                <canvas id="errorChart"></canvas>
+            </div>
+        </div>
+
+        <div class="history-panel">
+            <h2>Historia Gier</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Czas</th>
+                        <th>Sekwencja</th>
+                        <th>Długość</th>
+                        <th>Wynik</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let chartInstance = null;
+        let isUpdating = false;
+        let isHistoryLoading = false;
+        let lastGameStatus = null;
+
+        async function updateGameStatus() {
+            if(isUpdating) return;
+            isUpdating = true;
+            
+            try {
+                const response = await fetch('/status');
+                if(!response.ok) throw new Error('Network error');
+                const data = await response.json();
+                
+                document.querySelectorAll('.button').forEach(btn => {
+                    btn.classList.toggle('active', data.current_color === btn.id);
+                });
+
+                const progressBar = document.getElementById('progress');
+                const sequenceLength = data.full_sequence?.length || 1;
+                progressBar.style.width = `${(data.progress / sequenceLength) * 100 || 0}%`;
+
+                const instructions = document.getElementById('instructions');
+                const showMessage = data.game_status !== null;
+                
+                instructions.style.display = showMessage ? 'none' : 'block';
+                
+                const lostVisible = data.game_status === 'lost';
+                const wonVisible = data.game_status === 'won';
+                const errorVisible = data.game_status === 'system_error';
+                
+                document.getElementById('gameOverLost').style.display = lostVisible ? 'block' : 'none';
+                document.getElementById('gameOverWon').style.display = wonVisible ? 'block' : 'none';
+                document.getElementById('gameOverSystemError').style.display = errorVisible ? 'block' : 'none';
+
+                if(data.game_status !== lastGameStatus && data.game_status !== null) {
+                    await loadHistory();
+                }
+                
+                lastGameStatus = data.game_status;
+                
+            } catch(error) {
+                console.error('Update error:', error);
+            } finally {
+                isUpdating = false;
+            }
+        }
+    
+
+        async function loadHistory() {
+            if (isHistoryLoading) return;
+            isHistoryLoading = true;
+            
+            try {
+                const historyTable = document.getElementById('historyTable');
+                historyTable.innerHTML = '';
+                const response = await fetch('/history');
+                if(!response.ok) throw new Error('History load failed');
+                const data = await response.json();
+                
+                const stats = { successes: 0, errors: 0, system_errors: 0 };
+
+                processChunk(data, stats);
+                updateChart(stats);
+            } catch(error) {
+                console.error('History error:', error);
+            } finally {
+                isHistoryLoading = false;
+            }
+        }
+    
+        function processChunk(chunk, stats) {
+            const historyTable = document.getElementById('historyTable');
+            
+            chunk.forEach(entry => {
+                let sequence = entry.data;
+                let result = '';
+                let length = sequence.length;
+
+                if(entry.type === 'success') {
+                    result = 'Wygrana';
+                    stats.successes++;
+                }
+                else if(entry.type === 'error') {
+                    result = 'Przegrana';
+                    stats.errors++;
+                }
+                else if(entry.type === 'system_error') {
+                    result = 'Błąd aplikacji';
+                    stats.system_errors++;
+                }
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(entry.timestamp).toLocaleString()}</td>
+                    <td>${sequence}</td>
+                    <td>${length}</td>
+                    <td>${result}</td>
+                `;
+                historyTable.appendChild(row);
+            });
+        }
+
+    
+        function updateChart(stats) {
+            if(chartInstance) chartInstance.destroy();
+            
+            chartInstance = new Chart(document.getElementById('errorChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Wygrane', 'Przegrane', 'Błędy aplikacji'],
+                    datasets: [{
+                        data: [stats.successes, stats.errors, stats.system_errors],
+                        backgroundColor: ['#4CAF50', '#ff4444', '#ff9900']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                font: {
+                                    size: 18
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    
+        setInterval(() => {
+            updateGameStatus();
+        }, 100);
+        updateGameStatus().catch(console.error);
+        loadHistory().catch(console.error);
+    </script>
+
+</body>
+</html>
